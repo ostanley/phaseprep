@@ -1,0 +1,3 @@
+nipype==1.1.8
+numpy==1.14.2
+nibabel==2.2.1
