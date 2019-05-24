@@ -43,7 +43,7 @@ def create_preprocess_phase_wf():
                           name='maskfunc')
 
     # calculate the phase noise (takes in volume of activation, if none provided them assumes resting state)
-    calcSNR = pe.MapNode(interface=pp.RestAverage(), name='calcSNR', iterfield=['func'])
+    calcSNR = pe.MapNode(interface=pp.RestAverage(), name='calcSNR', iterfield=['func', 'rest', 'task'])
     # outputspec
     outputspec = pe.Node(ul.IdentityInterface(fields=['proc_phase', 'uw_phase', 'delta_phase','std_phase']),
                          name='outputspec')

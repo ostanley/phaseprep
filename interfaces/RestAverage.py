@@ -31,7 +31,7 @@ class RestAverage(BaseInterface):
 
         nvols = func.shape[3]
 
-        if self.inputs.rest!=None and self.inputs.task!=None:
+        if self.inputs.rest>0 and self.inputs.task>0:
             #assume block task
             volsrest = np.zeros([1,self.inputs.rest])
             volstask = np.ones([1,self.inputs.task])
@@ -44,7 +44,7 @@ class RestAverage(BaseInterface):
             activity[-1] = 0
         else:
             #assume resting state
-            activity=np.zeros([1,nvols])
+            activity=np.zeros([nvols,])
 
         imgmean = np.mean(func[:,:,:,activity!=1], axis=3)
         imgstd = np.std(func[:, :, :, activity!= 1], axis = 3)
