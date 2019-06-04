@@ -35,8 +35,8 @@ class RestAverage(BaseInterface):
             #assume block task
             volsrest = np.zeros([1,self.inputs.rest])
             volstask = np.ones([1,self.inputs.task])
-            volsrest[:,:trim]=1
-            volsrest[:,-trim:]=1
+            volsrest[:,:self.inputs.trim]=1
+            volsrest[:,-self.inputs.trim:]=1
 
             activity = np.tile(np.concatenate((volsrest, volstask),axis=1)[0], int(np.ceil(float(nvols)/len([volsrest, volstask]))))
             activity = activity[0:nvols]
