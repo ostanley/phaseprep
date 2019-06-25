@@ -9,7 +9,7 @@ class RestAverageInputSpec(BaseInterfaceInputSpec):
     func = File(exists=True, desc='functional to analyze', mandatory=True)
     task = traits.Int(desc='length of task, volumes')
     rest = traits.Int(desc='length of rest, volumes')
-    trim = traits.Int(desc='number of buffer volumes to remove from rest (allowing return to baseline)', default=1)
+    trim = traits.Int(desc='number of buffer volumes to remove from rest (allowing return to baseline)')
 
 
 class RestAverageOutputSpec(TraitedSpec):
@@ -32,16 +32,23 @@ class RestAverage(BaseInterface):
         nvols = func.shape[3]
 
         if self.inputs.rest>0 and self.inputs.task>0:
+            if not self.inputs.trim:
+                self.inputs.trim=1
             #assume block task
             volsrest = np.zeros([1,self.inputs.rest])
             volstask = np.ones([1,self.inputs.task])
+            print(volsrest, self.inputs.trim)
             volsrest[:,:self.inputs.trim]=1
+            print(volsrest)
             volsrest[:,-self.inputs.trim:]=1
+            print(volsrest)
 
             activity = np.tile(np.concatenate((volsrest, volstask),axis=1)[0], int(np.ceil(float(nvols)/len([volsrest, volstask]))))
             activity = activity[0:nvols]
             activity[0] = 0
             activity[-1] = 0
+            print(activity)
+            print(np.sum(activity)/len(activity))
         else:
             #assume resting state
             activity=np.zeros([nvols,])
