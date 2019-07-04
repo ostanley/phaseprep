@@ -138,11 +138,11 @@ class PhaseFitOdr(BaseInterface):
         outnii.to_filename(outname + '_xplus.nii.gz')
 
         # plot fit statistic info
-        outnii = nb.Nifti1Image(np.reshape(stdp, saveshape), affine=f.affine, header=f.get_header())
+        outnii = nb.Nifti1Image(np.reshape(stdp, saveshape[0:-1]), affine=f.affine, header=f.get_header())
         outnii.to_filename(outname + '_stdp.nii.gz')
-        outnii = nb.Nifti1Image(np.reshape(stdm, saveshape), affine=f.affine, header=f.get_header())
+        outnii = nb.Nifti1Image(np.reshape(stdm, saveshape[0:-1]), affine=f.affine, header=f.get_header())
         outnii.to_filename(outname + '_stdm.nii.gz')
-        outnii = nb.Nifti1Image(np.reshape(r2, saveshape), affine=f.affine, header=f.get_header())
+        outnii = nb.Nifti1Image(np.reshape(r2, saveshape[0:-1]), affine=f.affine, header=f.get_header())
         outnii.to_filename(outname + '_r2.nii.gz')
         return runtime
 
