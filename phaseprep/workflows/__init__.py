@@ -1,2 +1,3 @@
 from .preprocess_mag_wf import create_preprocess_mag_wf
 from .preprocess_phase_wf import create_preprocess_phase_wf
+from .feat_preproc_wf import create_feat_preproc_wf
