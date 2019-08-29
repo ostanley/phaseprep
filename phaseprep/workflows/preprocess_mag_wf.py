@@ -99,7 +99,6 @@ def create_preprocess_mag_wf():
     # extract brain with fsl and save the mask
     extractor = pe.Node(interface=fsl.BET(), name="extractor")
     extractor.inputs.mask = True
-    extractor.inputs.padding = True
 
     # apply the mask to all runs
     maskfunc = pe.MapNode(interface=fsl.ImageMaths(suffix='_bet',
