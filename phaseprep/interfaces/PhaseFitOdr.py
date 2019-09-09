@@ -98,7 +98,6 @@ class PhaseFitOdr(BaseInterface):
                     design=np.row_stack((ph[x,:], np.ones(ph[x,:].shape)))
                     ests = [stdm[x] / stdp[x], mm / mp]
                     mydata = odr.RealData(design, mag[x,:].T, sx=np.hstack([stdp[x],1]), sy=stdm[x])
-                print(mydata.x.shape, mydata.y.shape, mydata.sx.shape, mydata.sy, len(ests), design.shape)
 
                 # and fit model
                 # mag = A*phase + B*regressors + C
