@@ -10,10 +10,8 @@ class PhaseFitOdrInputSpec(BaseInterfaceInputSpec):
     phase = File(exists=True, desc='phase image', mandatory=True)
     mag = File(exists=True, desc='mag image', mandatory=True)
     TR = traits.Float(desc='repetition time of the scan', mandatory=True)
-    sig_ub = traits.Float(desc='Window filter upper bound')
-    sig_lb = traits.Float(desc='Window filter lower bound')
-    noise_lb = traits.Float(desc='Noise filer lower bound; should be higher than pyiological signal')
-
+    noise_lb = traits.Float(desc='Noise filter lower bound; should be higher than pyiological signal')
+    global_regressors = File(exists=True, desc='File of regressors in .tsv format')
 
 class PhaseFitOdrOutputSpec(TraitedSpec):
     sim = File(exists=True, desc="sim")
@@ -25,10 +23,16 @@ class PhaseFitOdrOutputSpec(TraitedSpec):
     stdm = File(exists=True, desc="std error in mag")
     stdp = File(exists=True, desc="std error in phase")
 
-
 class PhaseFitOdr(BaseInterface):
     input_spec = PhaseFitOdrInputSpec
     output_spec = PhaseFitOdrOutputSpec
+
+    def multiplelinear(self, beta, x):
+        f=np.zeros(x[0].shape)
+        for r in range(x.shape[0]):
+            f+=beta[r]*x[r]
+        f+=beta[-1]*np.ones(x[0].shape)
+        return f
 
     def _run_interface(self, runtime):
         f = nb.load(self.inputs.mag)
@@ -36,6 +40,9 @@ class PhaseFitOdr(BaseInterface):
 
         f = nb.load(self.inputs.phase)
         ph = f.get_data()
+
+        if self.inputs.global_regressors:
+            regressors = np.loadtxt(self.inputs.global_regressors)
 
         saveshape = np.array(mag.shape)
         nt = mag.shape[-1]
@@ -56,12 +63,11 @@ class PhaseFitOdr(BaseInterface):
         mm = np.mean(mag, axis=-1)
         mask = mm > 0.03 * np.max(mm)
 
-        linear = odr.unilinear
+        linearfit = odr.Model(self.multiplelinear)
 
         # freqs for FT indices
         freqs = np.linspace(-1.0, 1.0, nt) / (2 * self.inputs.TR)
 
-        sig_idx = np.where((freqs > self.inputs.sig_lb) * (freqs < self.inputs.sig_ub))[0]
         noise_idx = np.where((abs(freqs) > self.inputs.noise_lb))[0]
         noise_mask = np.fft.fftshift(1.0 * (abs(freqs) > self.inputs.noise_lb))
 
@@ -81,46 +87,38 @@ class PhaseFitOdr(BaseInterface):
         ph=np.reshape(ph, (-1, nt))
         for x in range(mag.shape[0]):
             if mask[x]:
-                # if (mag.shape[0] % x)==10000:
-                #     print('Processing xVal {} / {}...\n'.format(x, mag.shape[0]))
-                # save scalings for investigation
-                s1 = stdm[x]
-                s2 = stdp[x]
+                mm = np.mean(mag[x,:])
+                mp = np.mean(ph[x,:])
 
-                # now reference notch filtered data
-                # make contiguous
-                x1 = mag[x, :].copy()
-                x2 = ph[x, :].copy()
-
-                mm = np.mean(x1)
-                mp = np.mean(x2)
-
-                sm = np.std(x1)
-                sp = np.std(x2)
-
-                ests = [sm / sp, mm / mp]
+                if 'regressors' in locals():
+                    design=np.row_stack((ph[x,:], regressors.T, np.ones(ph[x,:].shape)))
+                    ests = np.hstack([[stdm[x] / stdp[x]], np.ones((regressors.shape[1],)), [mm / mp]])
+                    mydata = odr.RealData(design, mag[x,:].T,sx=np.hstack((stdp[x], np.std(regressors, axis=0),1)), sy=stdm[x])
+                else:
+                    design=np.row_stack((ph[x,:], np.ones(ph[x,:].shape)))
+                    ests = [stdm[x] / stdp[x], mm / mp]
+                    mydata = odr.RealData(design, mag[x,:].T, sx=np.hstack([stdp[x],1]), sy=stdm[x])
+                print(mydata.x.shape, mydata.y.shape, mydata.sx.shape, mydata.sy, len(ests), design.shape)
 
                 # and fit model
-                # mag = A*phase + B
+                # mag = A*phase + B*regressors + C
                 # (y=mx+b)
                 # call : (x,y,sx,sy)
-                mydata = odr.RealData(x2, x1, sx=s2, sy=s1)
-                odr_obj = odr.ODR(mydata, linear, beta0=ests, maxit=200)
+                odr_obj = odr.ODR(mydata, linearfit, beta0=ests, maxit=200)
                 res = odr_obj.run()
+                print(res.stopreason, res.beta)
                 est = res.y
-                rsq = 1.0 - sum((x1 - est) ** 2) / sum((x1 - mm) ** 2)
+                r2[x] = 1.0 - sum((mag[x,:] - est) ** 2) / sum((mag[x,:] - mm) ** 2)
 
-                # take out scaled phase signal and re-mean
-                sim[x, :] = est
+                # take out scaled phase signal and re-mean may need correction
+                sim[x, :] = ph[x,:]*res.beta[0]
 
-                filt[x, :] = x1 - est + mm
-                # estimate R^2
-                r2[x] = rsq
+                filt[x, :] = mag[x,:] - est + mm
                 # estimate residuals
-                residuals[x, :] = np.sign(x1-est) * (res.delta**2 + res.eps**2)
-                delta[x, :] = res.delta
+                residuals[x, :] = np.sign(mag[x,:]-est) * (np.sum(res.delta**2, axis=0) + res.eps**2)
+                delta[x, :] = np.sum(res.delta, axis=0)
                 eps[x, :] = res.eps
-                xshift[x, :] = res.xplus
+                xshift[x, :] = np.sum(res.xplus, axis=0)
 
         _, outname, _ = split_filename(self.inputs.mag)
         print(outname)
