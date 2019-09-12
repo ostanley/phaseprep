@@ -105,7 +105,6 @@ class PhaseFitOdr(BaseInterface):
                 # call : (x,y,sx,sy)
                 odr_obj = odr.ODR(mydata, linearfit, beta0=ests, maxit=200)
                 res = odr_obj.run()
-                print(res.stopreason, res.beta)
                 est = res.y
                 r2[x] = 1.0 - sum((mag[x,:] - est) ** 2) / sum((mag[x,:] - mm) ** 2)
 
