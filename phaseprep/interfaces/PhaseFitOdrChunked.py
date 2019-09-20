@@ -126,14 +126,12 @@ class PhaseFitOdrChunked(BaseInterface):
                             ests = [stdm[r,c,slice] / stdp[r,c,slice], mm / mp]
                             mydata = odr.RealData(design, mag[x,:].T, sx=np.hstack([stdp[r,c,slice],1]),
                                                   sy=stdm[r,c,slice])
-                        print('Setup fit for voxel: ', x)
                         # and fit model
                         # mag = A*phase + B*regressors + C
                         # (y=mx+b)
                         # call : (x,y,sx,sy)
                         odr_obj = odr.ODR(mydata, linearfit, beta0=ests, maxit=200)
                         res = odr_obj.run()
-                        print('ran fit for voxel: ', x)
                         est = res.y
                         r2[r,c,slice] = 1.0 - sum((mag[x,:] - est) ** 2) / sum((mag[x,:] - mm) ** 2)
                         beta[r,c,slice,:] = res.beta
@@ -141,7 +139,6 @@ class PhaseFitOdrChunked(BaseInterface):
                         # take out scaled phase signal
                         sim[r,c,slice] = ph[x,:]*res.beta[0]
                         filt[r,c,slice] = mag[x,:] - est + mm
-                        print('saved fit for voxel: ', x)
 
             _, outname, _ = split_filename(self.inputs.mag)
             print(outname)
