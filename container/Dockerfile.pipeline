@@ -6,7 +6,5 @@ RUN bash /src/install_scripts/05.install_phaseprep.sh /opt > log_05_pr
 #remove all install scripts
 RUN rm -rf /src
 
-#copy over pipeline
-#COPY NHP_RestingState.py /opt/NHP_RestingState.py
-
+# install pybids
 RUN pip3 install pybids==0.6.5
