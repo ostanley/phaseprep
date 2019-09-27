@@ -1,0 +1,39 @@
+name: Neurobeer Latest Deployment
+
+on:
+  pull_request:
+    branches:
+    - master
+    types: [closed]
+
+jobs:
+  docker_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout correct branch
+    - uses: actions/checkout@master
+      with:
+        ref: refs/heads/master
+
+    # Build and deploy docker dev image
+    - name: Build & deploy Docker latest image
+      if: github.event.pull_request.merged == true
+      env:
+        DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+        DOCKER_HUB_KEY: ${{ secrets.DOCKER_HUB_KEY }}
+      run: |
+        echo 'Docker login'
+        echo ''
+        docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_KEY
+        echo ''
+        echo 'Building docker image...'
+        echo ''
+        cd container
+        docker build -f Dockerfile.pipeline --tag $DOCKER_HUB_USER/phaseprep:latest
+        echo ''
+        echo 'Pushing docker image...'
+        echo ''
+        docker push $DOCKER_HUB_USER/phaseprep:latest
+        echo ''
+        echo 'Finished deploying docker image!'
