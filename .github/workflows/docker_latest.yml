@@ -1,4 +1,4 @@
-name: Neurobeer Latest Deployment
+name: phaseprep Latest Deployment
 
 on:
   pull_request:
