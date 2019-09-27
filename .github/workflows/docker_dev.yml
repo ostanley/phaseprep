@@ -30,7 +30,7 @@ jobs:
         echo ''
         cd container
         ls
-        docker build -f Dockerfile.pipeline --tag $DOCKER_HUB_USER/phaseprep:dev
+        docker build -f Dockerfile.pipeline --tag $DOCKER_HUB_USER/phaseprep:dev .
         echo ''
         echo 'Pushing docker image...'
         echo ''
