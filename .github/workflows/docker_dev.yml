@@ -1,4 +1,4 @@
-name: Neurobeer Dev Deployment
+name: phaseprep Dev Deployment
 
 on:
   push:
@@ -29,6 +29,7 @@ jobs:
         echo 'Building docker image...'
         echo ''
         cd container
+        ls
         docker build -f Dockerfile.pipeline --tag $DOCKER_HUB_USER/phaseprep:dev
         echo ''
         echo 'Pushing docker image...'
