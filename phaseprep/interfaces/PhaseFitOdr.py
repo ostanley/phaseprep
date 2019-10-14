@@ -31,6 +31,13 @@ class PhaseFitOdrOutputSpec(TraitedSpec):
 
 
 class PhaseFitOdr(BaseInterface):
+    """Nipype Interface to fit phase and magnitude data together
+
+    Inputs:
+
+    Outputs:
+
+    """
     input_spec = PhaseFitOdrInputSpec
     output_spec = PhaseFitOdrOutputSpec
 
