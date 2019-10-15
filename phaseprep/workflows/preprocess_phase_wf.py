@@ -5,6 +5,20 @@ import phaseprep.interfaces as pp
 import nipype.interfaces.utility as ul
 
 def create_preprocess_phase_wf():
+    """Create's phase preprocessing workflow with the following steps:
+
+    1) Convert data to float
+    2) Determine scaling required for radians
+    3) Apply radian scaling
+    4) Convert to real and imaginary
+    5) Apply magnitude motion correction parameters
+    6) Convert back to phase
+    7) Unwrap and detrend data
+    8) Correct geometry changes (AFNI issue)
+    9) Mask data using magnitude mask
+    10) Calculate noise from data
+
+    """
     preprocphase = pe.Workflow(name="preprocphase")
     preprocphase.config['execution']['remove_unnecessary_outputs'] = False
 
@@ -18,32 +32,37 @@ def create_preprocess_phase_wf():
                                                      ]),
                         name='inputspec')
 
-    # convert image to float
+    # 1) Convert data to float
     img2float = pe.MapNode(interface=fsl.ImageMaths(out_data_type='float', op_string='', suffix='_dtype'),
                            iterfield=['in_file'],
                            name='img2float')
 
-    # prepare phase (first volume substraction, temporal unwraping, linear detrending)
-    prepphase = pe.MapNode(interface=pp.PreprocessPhase(), name='prepphase', iterfield=['phase'])
-    prepphase.inputs.bit_depth=12
+    # 3) Apply radian scaling
 
-    # motion correct each run
+    # 4) Convert to real and imaginary
+
+    # 5) Apply magnitude motion correction parameters
     moco = pe.MapNode(interface=afni.Allineate(), name='moco', iterfield=['in_file', 'in_matrix'])
     moco.inputs.outputtype = 'NIFTI_GZ'
     moco.inputs.out_file = 'mocophase.nii.gz'
     moco.inputs.num_threads = 2
 
-    # afni messes with the header (unobliques the data) this puts it back
+    # 6) Convert back to phase
+
+    # 7) Remove first volume, unwrap and detrend phase data
+    prepphase = pe.MapNode(interface=pp.PreprocessPhase(), name='prepphase', iterfield=['phase'])
+
+    # 8) Correct geometry changes (AFNI issue)
     cpgeommoco = pe.MapNode(interface=fsl.CopyGeom(), name='cpgeommoco', iterfield=['dest_file', 'in_file'])
 
-    # apply the mask to all runs
+    # 9) Mask data using magnitude mask
     maskfunc = pe.MapNode(interface=fsl.ImageMaths(suffix='_bet',
                                                    op_string='-mas'),
                           iterfield=['in_file'],
                           name='maskfunc')
-
-    # calculate the phase noise (takes in volume of activation, if none provided them assumes resting state)
+    # 10) Calculate noise from data
     calcSNR = pe.MapNode(interface=pp.RestAverage(), name='calcSNR', iterfield=['func', 'rest', 'task'])
+
     # outputspec
     outputspec = pe.Node(ul.IdentityInterface(fields=['proc_phase', 'uw_phase', 'delta_phase','std_phase']),
                          name='outputspec')
