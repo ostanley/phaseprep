@@ -4,6 +4,15 @@ import nipype.interfaces.afni as afni
 import phaseprep.interfaces as pp
 import nipype.interfaces.utility as ul
 
+def findscaling(in_file):
+    import nibabel as nb
+    img=nb.load(in_file)
+    if img.dataobj.slope!=1.0:
+        print('Removing rescale before conversion')
+    mul = np.pi/(2**12*img.dataobj.slope)
+    sub = np.pi*((img.dataobj.slope+1)/(2**12*img.dataobj.slope))
+    return '-mul %s -sub %s' % (mul, sub)
+
 def create_preprocess_phase_wf():
     """Create's phase preprocessing workflow with the following steps:
 
@@ -37,9 +46,16 @@ def create_preprocess_phase_wf():
                            iterfield=['in_file'],
                            name='img2float')
 
+    # 2) Determine radian scaling required
+    findscaling = pe.MapNode(interface=ul.Function(in_file, scaling_arg, findscaling), name='findscaling', iterfield=['in_file'])
+
     # 3) Apply radian scaling
+    convert2rad = pe.MapNode(interface=fsl.ImageMaths(out_data_type='char',
+                                                 suffix='_converted'),
+                             name='convert2rad', iterfield=['in_file', 'op_string'])
 
     # 4) Convert to real and imaginary
+
 
     # 5) Apply magnitude motion correction parameters
     moco = pe.MapNode(interface=afni.Allineate(), name='moco', iterfield=['in_file', 'in_matrix'])
@@ -69,21 +85,22 @@ def create_preprocess_phase_wf():
 
     preprocphase = pe.Workflow(name='preprocphase')
     preprocphase.connect([(inputspec, img2float, [('input_phase', 'in_file')]),
-                          (inputspec, prepphase, [('siemensbool','siemens')]),
-                          (img2float, prepphase, [('out_file', 'phase')]),
-                          (inputspec, moco, [('motion_par', 'in_matrix')]),
-                          (prepphase, moco, [('detrended_phase', 'in_file')]),
-                          (img2float, cpgeommoco, [('out_file', 'in_file')]),
-                          (moco, cpgeommoco, [('out_file', 'dest_file')]),
-                          (cpgeommoco, maskfunc, [('out_file', 'in_file')]),
-                          (inputspec, maskfunc, [('mask_file', 'in_file2')]),
-                          (maskfunc, outputspec,[('out_file', 'proc_phase')]),
-                          (prepphase, outputspec, [('uw_phase', 'uw_phase')]),
-                          (prepphase, outputspec, [('delta_phase', 'delta_phase')]),
-                          (inputspec, calcSNR, [('rest', 'rest'),
-                                                ('task', 'task')]),
-                          (prepphase, calcSNR, [('detrended_phase', 'func')]),
-                          (calcSNR, outputspec, [('noise', 'std_phase')])
+                          (inputspec, findscaling, [('input_phase', 'in_file')]),
+                          (findscaling, convert2rad, [('scaling_arg', 'op_sting')]),
+                          (img2float, convert2rad, [('out_file', 'in_file')]),
+                          # (inputspec, moco, [('motion_par', 'in_matrix')]),
+                          # (prepphase, moco, [('detrended_phase', 'in_file')]),
+                          # (img2float, cpgeommoco, [('out_file', 'in_file')]),
+                          # (moco, cpgeommoco, [('out_file', 'dest_file')]),
+                          # (cpgeommoco, maskfunc, [('out_file', 'in_file')]),
+                          # (inputspec, maskfunc, [('mask_file', 'in_file2')]),
+                          # (maskfunc, outputspec,[('out_file', 'proc_phase')]),
+                          # (prepphase, outputspec, [('uw_phase', 'uw_phase')]),
+                          # (prepphase, outputspec, [('delta_phase', 'delta_phase')]),
+                          # (inputspec, calcSNR, [('rest', 'rest'),
+                          #                       ('task', 'task')]),
+                          # (prepphase, calcSNR, [('detrended_phase', 'func')]),
+                          # (calcSNR, outputspec, [('noise', 'std_phase')])
                           ])
 
     return preprocphase
