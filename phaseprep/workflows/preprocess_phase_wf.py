@@ -24,9 +24,9 @@ def create_preprocess_phase_wf():
     3) Apply radian scaling
     4) Convert to real and imaginary
     5) Apply magnitude motion correction parameters
-    6) Convert back to phase
-    7) Unwrap and detrend data
-    8) Correct geometry changes (AFNI issue)
+    6) Correct geometry changes (AFNI issue)
+    7) Convert back to phase
+    8) Unwrap and detrend data
     9) Mask data using magnitude mask
     10) Calculate noise from data
 
@@ -39,7 +39,6 @@ def create_preprocess_phase_wf():
                                                      'input_mag', # raw mag data
                                                      'motion_par', # afni transform concatenated from magnitude data
                                                      'mask_file', # bet mask from magnitude data
-                                                     'siemensbool', # true if data is in siemens units (0,4095)
                                                      'rest', # volumes of rest in block design
                                                      'task', # volumes of task in block design
                                                      ]),
@@ -75,18 +74,21 @@ def create_preprocess_phase_wf():
     mocoreal.inputs.num_threads = 2
     mocoimag = mocoreal.clone('mocoimag')
 
-    # 6) Convert back to phase (2 step process)
-    makecomplexmocomplex = pe.MapNode(interface=fsl.Complex(complex_cartesian=True), name='makecomplexmoco',
+    # 6) Correct geometry changes (AFNI issue)
+    cpgeommocoreal = pe.MapNode(interface=fsl.CopyGeom(), name='cpgeommoco', iterfield=['dest_file', 'in_file'])
+    cpgeommocoimag = cpgeommocoreal.clone('cpgeommocoimag')
+    cpgeommocophase = cpgeommocoreal.clone('cpgeommocophase')
+
+    # 7) Convert back to phase (2 step process)
+    makecomplexmoco = pe.MapNode(interface=fsl.Complex(complex_cartesian=True), name='makecomplexmoco',
                                       iterfield=['real_in_file', 'imaginary_in_file'])
 
     splitcomplexmoco = pe.MapNode(interface=fsl.Complex(real_polar=True), name='splitcomplexmoco',
                                   iterfield=['complex_in_file'])
 
-    # 7) Remove first volume, unwrap and detrend phase data
+    # 8) Remove first volume, unwrap and detrend phase data
     prepphase = pe.MapNode(interface=pp.PreprocessPhase(), name='prepphase', iterfield=['phase'])
 
-    # 8) Correct geometry changes (AFNI issue)
-    cpgeommoco = pe.MapNode(interface=fsl.CopyGeom(), name='cpgeommoco', iterfield=['dest_file', 'in_file'])
 
     # 9) Mask data using magnitude mask
     maskfunc = pe.MapNode(interface=fsl.ImageMaths(suffix='_bet',
@@ -101,26 +103,36 @@ def create_preprocess_phase_wf():
                          name='outputspec')
 
     preprocphase = pe.Workflow(name='preprocphase')
-    preprocphase.connect([(inputspec, img2float, [('input_phase', 'in_file')]),
-                          (inputspec, findscaling, [('input_phase', 'in_file')]),
+    preprocphase.connect([(inputspec, img2float, [('input_phase', 'in_file')]), # 1
+                          (inputspec, findscaling, [('input_phase', 'in_file')]), # 2
                           (findscaling, convert2rad, [('scaling_arg', 'args')]),
                           (img2float, convert2rad, [('out_file', 'in_file')]),
-                          (convert2rad, makecomplex, [('out_file', 'phase_in_file')]),
+                          (convert2rad, makecomplex, [('out_file', 'phase_in_file')]), # 3
                           (inputspec, makecomplex, [('input_mag', 'magnitude_in_file')]),
-                          (makecomplex, splitcomplex, [('complex_out_file', 'complex_in_file')])
-                          # (inputspec, moco, [('motion_par', 'in_matrix')]),
-                          # (prepphase, moco, [('detrended_phase', 'in_file')]),
-                          # (img2float, cpgeommoco, [('out_file', 'in_file')]),
-                          # (moco, cpgeommoco, [('out_file', 'dest_file')]),
-                          # (cpgeommoco, maskfunc, [('out_file', 'in_file')]),
-                          # (inputspec, maskfunc, [('mask_file', 'in_file2')]),
-                          # (maskfunc, outputspec,[('out_file', 'proc_phase')]),
-                          # (prepphase, outputspec, [('uw_phase', 'uw_phase')]),
-                          # (prepphase, outputspec, [('delta_phase', 'delta_phase')]),
-                          # (inputspec, calcSNR, [('rest', 'rest'),
-                          #                       ('task', 'task')]),
-                          # (prepphase, calcSNR, [('detrended_phase', 'func')]),
-                          # (calcSNR, outputspec, [('noise', 'std_phase')])
+                          (makecomplex, splitcomplex, [('complex_out_file', 'complex_in_file')]), # 4
+                          (inputspec, mocoreal, [('motion_par', 'in_matrix')]), # 5 real
+                          (splitcomplex, mocoreal, [('real_out_file', 'in_file')]),
+                          (mocoreal, cpgeommocoreal, [('out_file','dest_file')]), #6 real
+                          (img2float, cpgeommocoreal, [('out_file', 'in_file')]),
+                          (inputspec, mocoimag, [('motion_par', 'in_matrix')]), # 5 imag
+                          (splitcomplex, mocoimag, [('imaginary_out_file', 'in_file')]),
+                          (mocoimag, cpgeommocoimag, [('out_file','dest_file')]), # 6 imag
+                          (img2float, cpgeommocoimag, [('out_file', 'in_file')]),
+                          (cpgeommocoreal, makecomplexmoco, [('out_file', 'real_in_file')]), # 7
+                          (cpgeommocoimag, makecomplexmoco, [('out_file', 'imaginary_in_file')]),
+                          (makecomplexmoco, splitcomplexmoco, [('complex_out_file', 'complex_in_file')]),
+                          (splitcomplexmoco, cpgeommocophase, [('phase_out_file', 'dest_file')]),
+                          (img2float, cpgeommocophase, [('out_file', 'in_file')]),
+                          (cpgeommocophase, prepphase, [('out_file', 'phase')]), # 8
+                          (prepphase, maskfunc, [('detrended_phase', 'in_file')]), # 9
+                          (inputspec, maskfunc, [('mask_file', 'in_file2')]),
+                          (maskfunc, outputspec,[('out_file', 'proc_phase')]),
+                          (prepphase, outputspec, [('uw_phase', 'uw_phase')]),
+                          (prepphase, outputspec, [('delta_phase', 'delta_phase')]),
+                          (inputspec, calcSNR, [('rest', 'rest'), # 10
+                                                ('task', 'task')]),
+                          (prepphase, calcSNR, [('detrended_phase', 'func')]),
+                          (calcSNR, outputspec, [('noise', 'std_phase')])
                           ])
 
     return preprocphase
