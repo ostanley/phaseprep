@@ -9,10 +9,23 @@ import os.path as op
 from bids.layout import BIDSLayout
 from nipype import config, logging
 from phaseprep.interfaces import PhaseFitOdr
+from nipype.utils.filemanip import split_filename
 
 
-def findBIDSData(path):
-    return path
+def get_tasklength(filename):
+    # TODO: write block based specifity
+    if isinstance(filelist, list):
+        return [-1]*len(filelist)
+    else:
+        return -1
+
+
+def get_restlength(filename):
+    # TODO: write block based specifity
+    if isinstance(filelist, list):
+        return [-1]*len(filelist)
+    else:
+        return -1
 
 
 def runpipeline(parser):
@@ -26,7 +39,9 @@ def runpipeline(parser):
     # 2) parse optional inputs
     nthreads = int(args.nthreads)
     bet_thr = float(args.bet_thr)
+    small_fov = bool(args.small_fov)
     radians = bool(args.radians)
+    read_task_SNR = bool(args.taskSNR)
 
     # 2a) Need BIDS directory if no subjects chosen, use BIDSDataGrabber for this
     layout = BIDSLayout(bids_dir)
@@ -95,28 +110,77 @@ def runpipeline(parser):
 
         maglist_final = []
         phaselist_final = []
+        # TODO: Match when there are multiple types of different runs
         for f in maglist:
             if f.run in phaseruns:
-                # TODO: Check that runs have matching legth, if not exclude.
                 pf = phaselist[phaseruns.index(f.run)]
+                print("Processing magnitude run: ", f.run, "\n")
+
+                # Check that runs have matching prefixes
+                _, fname, _ = split_filename(f.filename)
+                _, pfname, _ = split_filename(pf.filename)
+                if fname[:-4] != pfname[:-5]:
+                    continue
+
+                # TODO: Check that runs have matching length, if not exclude.
+                if f.get_metadata()['dcmmeta_shape'][-1] != pf.get_metadata()['dcmmeta_shape'][-1]:
+                    continue
+
+                # Check that runs have matching acq time, if not exclude.
+                if 'AcquisitionTime' in f.get_metadata().keys():
+                    if f.get_metadata()['AcquisitionTime'] != pf.get_metadata()['AcquisitionTime']:
+                        continue
+
                 maglist_final.append(f)
                 phaselist_final.append(phaselist[phaseruns.index(f.run)])
 
-        print(len(maglist_final), " runs with phase and magnitude were found.\n")
+        print(len(maglist_final), "runs with phase and magnitude were found.")
         print("Runs: ", [f.run for f in maglist_final])
-        # These runs have a matching length and phase regression will be preformed")
+        print("These runs have a matching length, name, and acquisition times.\n")
 
     # Step two will be magnitude preprocessing
+    preproc_mag_wf = create_preprocess_mag_wf()
+    preproc_mag_wf.inputs.inputspec.frac = bet_thr
+    preproc_mag_wf.inputs.inputspec.input_mag = maglist_final
+    preproc_mag_wf.inputs.extractor.robust = small_fov
+    if read_task_SNR is True:
+        preproc_mag_wf.inputs.inputspec.task = get_tasklength(maglist_final)
+        preproc_mag_wf.inputs.inputspec.rest = get_restlength(maglist_final)
+    else:
+        preproc_mag_wf.inputs.inputspec.task = -1
+        preproc_mag_wf.inputs.inputspec.rest = -1
 
     # Step three will be phase preprocessing
+    preproc_phase_wf = create_preprocess_phase_wf()
+    preproc_phase_wf.inputs.inputspec.input_mag = phaselist_final
+    preproc_phase_wf.inputs.inputspec.siemensbool = (radians == False)
+    if read_task_SNR is True:
+        preproc_mag_wf.inputs.inputspec.task = get_tasklength(phaselist_final)
+        preproc_mag_wf.inputs.inputspec.rest = get_restlength(phaselist_final)
+    else:
+        preproc_phase_wf.inputs.inputspec.task = -1
+        preproc_phase_wf.inputs.inputspec.rest = -1
 
-    # Step four will be running phase regression on the dataset
+    # Regress ge magnitude and phase
+    # TODO: Function to get TR
+    phaseregress = pe.MapNode(interface=PhaseFitOdr(), name='phaseregressodr', iterfield=['phase',
+                                                                                          'mag'])
+    phaseregress.inputs.noise_lb = 0.015
 
     # Step five will be ongoing during the previous steps ensuring correct sinking
 
     # Step six will be running this into a report
 
-    print("ran pipline")
+    phaseprep = pe.Workflow(name='phaseprep')
+    phaseprep.base_dir = work_dir
+    phaseprep.connect([(preproc_mag_wf, preproc_phase_wf, [('outputspec.motion_par',
+                                                           'inputspec.motion_par'),
+                                                           ('outputspec.mask_file',
+                                                           'inputspec.mask_file')]),
+                       (preproc_mag_wf, phaseregress, [('outputspec.proc_mag', 'mag')]),
+                       ])
+
+    print("setup pipline succesfully")
 
 
 if __name__ == '__main__':
@@ -138,6 +202,12 @@ if __name__ == '__main__':
                        help="List of subjects to limit analysis to delimit with ,")
     g_opt.add_argument("-b", "--bet_thr", dest="bet_thr", default=0.3,
                        help="User provided bet parameter, default 0.3")
+    g_opt.add_argument("--small_fov", dest="small_fov", default=False,
+                       help="In development: uses -Z for bet and may result in better images"
+                       " if small FOV used")
+    g_opt.add_argument("--taskbased_SNR", dest="taskSNR", default=False,
+                       help="In development: reads block of task length from events.tsv in order to"
+                       " calculate tSNR only during rest")
     g_opt.add_argument("--radians", dest="radians", default=False,
                        help="Data is in radians not siemens units")
     g_opt.add_argument("-w", "--work_dir", dest="work_dir",
