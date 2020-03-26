@@ -14,6 +14,12 @@ cd $DIR
 git clone https://git.cfmm.robarts.ca/nipype/phaseprep.git
 cd $DIR/phaseprep
 
+echo argv[1]
+if [argv[1] = 'dev']
+do
+  git checkout dev
+done
+
 # Install requirements starting with fmriprep dependencies
 pip3 install -r requirements.txt
 
