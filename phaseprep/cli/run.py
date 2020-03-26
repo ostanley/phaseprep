@@ -101,7 +101,6 @@ def runpipeline(parser):
                              suffix='bold', extension=['nii', 'nii.gz'])
         phaselist = layout.get(subject=subject_id, datatype='func',
                                suffix='phase', extension=['nii', 'nii.gz'])
-        print(maglist, phaselist)
         print("Found ", max(len(maglist), len(phaselist)), " functional runs.")
 
         # get list of phase runs
@@ -179,6 +178,11 @@ def runpipeline(parser):
                        ])
 
     print("setup pipline succesfully")
+    if args.test is True:
+        starttime = time()
+        phaseprep.run(plugin='MultiProc', plugin_args={'n_procs': nthreads})
+        print("completed pipeline in ", time()-starttime, " seconds.")
+
 
 
 if __name__ == '__main__':
@@ -220,5 +224,6 @@ if __name__ == '__main__':
                        help="If fmriprep has been run and you wish to use"
                        " their transformations, the directory where the output"
                        " is stored")
-
+    g_opt.add_argument("-t", "--test", dest="test", default=False,
+                       help="Setup but do not run pipeline")
     runpipeline(parser)
