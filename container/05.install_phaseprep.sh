@@ -16,9 +16,9 @@ cd $DIR/phaseprep
 
 echo argv[1]
 if [argv[1] = 'dev']
-do
+then
   git checkout dev
-done
+fi
 
 # Install requirements starting with fmriprep dependencies
 pip3 install -r requirements.txt
