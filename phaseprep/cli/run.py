@@ -40,7 +40,6 @@ def runpipeline(parser):
     nthreads = int(args.nthreads)
     bet_thr = float(args.bet_thr)
     small_fov = bool(args.small_fov)
-    radians = bool(args.radians)
     read_task_SNR = bool(args.taskSNR)
 
     # 2a) Need BIDS directory if no subjects chosen, use BIDSDataGrabber for this
@@ -153,7 +152,6 @@ def runpipeline(parser):
     # Step three will be phase preprocessing
     preproc_phase_wf = create_preprocess_phase_wf()
     preproc_phase_wf.inputs.inputspec.input_mag = phaselist_final
-    preproc_phase_wf.inputs.inputspec.siemensbool = (radians == False)
     if read_task_SNR is True:
         preproc_mag_wf.inputs.inputspec.task = get_tasklength(phaselist_final)
         preproc_mag_wf.inputs.inputspec.rest = get_restlength(phaselist_final)
@@ -208,8 +206,6 @@ if __name__ == '__main__':
     g_opt.add_argument("--taskbased_SNR", dest="taskSNR", default=False,
                        help="In development: reads block of task length from events.tsv in order to"
                        " calculate tSNR only during rest")
-    g_opt.add_argument("--radians", dest="radians", default=False,
-                       help="Data is in radians not siemens units")
     g_opt.add_argument("-w", "--work_dir", dest="work_dir",
                        help="Work directory. Defaults to "
                        "<bids_dir>/derivatives/phaseprep/work")
