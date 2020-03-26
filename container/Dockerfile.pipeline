@@ -7,4 +7,6 @@ RUN bash /src/install_scripts/05.install_phaseprep.sh /opt > log_05_pr
 RUN rm -rf /src
 
 # install pybids
-RUN pip3 install pybids==0.6.5
+RUN pip3 install pybids==0.9.4
+
+ENTRYPOINT /opt/git/phaseprep/phaseprep/cli/run.py
