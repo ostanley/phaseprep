@@ -1,7 +1,7 @@
 FROM waltyelnats/phaseregression:base
 #need to copy this over separetely until finished
-COPY 05.install_phaseprep.sh /src/install_scripts/05.install_phaseprep.sh
-RUN bash /src/install_scripts/05.install_phaseprep.sh dev > log_05_pr
+COPY 05.install_phaseprep_dev.sh /src/install_scripts/05.install_phaseprep_dev.sh
+RUN bash /src/install_scripts/05.install_phaseprep_dev.sh > log_05_pr
 
 #remove all install scripts
 RUN rm -rf /src
@@ -9,4 +9,5 @@ RUN rm -rf /src
 # install pybids
 RUN pip3 install pybids==0.9.4
 
-ENTRYPOINT /opt/git/phaseprep/phaseprep/cli/run.py
+ENTRYPOINT ["python3", "/opt/git/phaseprep/phaseprep/cli/run.py"]
+
