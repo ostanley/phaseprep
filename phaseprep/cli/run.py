@@ -120,9 +120,10 @@ def runpipeline(parser):
                 if fname[:-4] != pfname[:-5]:
                     continue
 
-                # TODO: Check that runs have matching length, if not exclude.
-                if f.get_metadata()['dcmmeta_shape'][-1] != pf.get_metadata()['dcmmeta_shape'][-1]:
-                    continue
+                # Check that runs have matching length, if not exclude.
+                if 'dcmmeta_shape' in f.get_metadata().keys():
+                    if f.get_metadata()['dcmmeta_shape'][-1] != pf.get_metadata()['dcmmeta_shape'][-1]:
+                        continue
 
                 # Check that runs have matching acq time, if not exclude.
                 if 'AcquisitionTime' in f.get_metadata().keys():
