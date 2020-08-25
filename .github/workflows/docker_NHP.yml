@@ -1,0 +1,42 @@
+name: phaseprep NHP Container Deployment
+
+on:
+  push:
+    branches:
+    - NHP_Pipeline
+
+jobs:
+  docker_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout correct branch
+    - uses: actions/checkout@master
+      with:
+        ref: ${{ github.ref }}
+
+    # Build and deploy docker dev image
+    - name: Build & deploy Docker NHP image
+      if: github.ref == 'refs/heads/NHP_Pipeline'
+      env:
+        DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+        DOCKER_HUB_KEY: ${{ secrets.DOCKER_HUB_KEY }}
+      run: |
+        echo 'Free Space'
+        echo ''
+        df -h
+        echo 'Docker login'
+        echo ''
+        docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_KEY
+        echo ''
+        echo 'Building docker image...'
+        echo ''
+        cd container
+        ls
+        docker build -f Dockerfile.pipeline_NHP --tag $DOCKER_HUB_USER/phaseprep:NHP .
+        echo ''
+        echo 'Pushing docker image...'
+        echo ''
+        docker push $DOCKER_HUB_USER/phaseprep:NHP
+        echo ''
+        echo 'Finished deploying docker image!'
