@@ -60,11 +60,9 @@ def create_preprocess_phase_wf():
                              name='convert2rad', iterfield=['in_file', 'args'])
 
     # 4) Convert to real and imaginary (2 step process)
-    makecomplex = pe.MapNode(interface=fsl.Complex(complex_polar=True), name='makecomplex',
-                             iterfield=['magnitude_in_file', 'phase_in_file'])
-
-    splitcomplex = pe.MapNode(interface=fsl.Complex(real_cartesian=True), name='splitcomplex',
-                              iterfield=['complex_in_file'])
+    # modified from fslcomplex to fslmaths in Sep 2020, bonus also preserves geometry info
+    convert2real = pe.MapNode(interface=fsl.maths.MultiImageMaths(op_string=' -cos -mul %s'), name='convert2real', iterfield=['in_file','operand_files'])
+    convert2imag = pe.MapNode(interface=fsl.maths.MultiImageMaths(op_string=' -sin -mul %s'), name='convert2imag', iterfield=['in_file','operand_files'])
 
     # 5) Apply magnitude motion correction parameters
     mocoreal = pe.MapNode(interface=afni.Allineate(), name='mocoreal',
@@ -77,18 +75,12 @@ def create_preprocess_phase_wf():
     # 6) Correct geometry changes (AFNI issue)
     cpgeommocoreal = pe.MapNode(interface=fsl.CopyGeom(), name='cpgeommoco', iterfield=['dest_file', 'in_file'])
     cpgeommocoimag = cpgeommocoreal.clone('cpgeommocoimag')
-    cpgeommocophase = cpgeommocoreal.clone('cpgeommocophase')
 
-    # 7) Convert back to phase (2 step process)
-    makecomplexmoco = pe.MapNode(interface=fsl.Complex(complex_cartesian=True), name='makecomplexmoco',
-                                      iterfield=['real_in_file', 'imaginary_in_file'])
-
-    splitcomplexmoco = pe.MapNode(interface=fsl.Complex(real_polar=True), name='splitcomplexmoco',
-                                  iterfield=['complex_in_file'])
+    # 7) Convert back to phase custom interface to use atan2 and avoid sign ambiguity
+    convert2phase = pe.MapNode(interface=pp.Convert2Phase(), name='convert2phase', iterfield=['real_image','imaginary_image'])
 
     # 8) Remove first volume, unwrap and detrend phase data
     prepphase = pe.MapNode(interface=pp.PreprocessPhase(), name='prepphase', iterfield=['phase'])
-
 
     # 9) Mask data using magnitude mask
     maskfunc = pe.MapNode(interface=fsl.ImageMaths(suffix='_bet',
@@ -107,26 +99,24 @@ def create_preprocess_phase_wf():
                           (inputspec, findscaling, [('input_phase', 'in_file')]), # 2
                           (findscaling, convert2rad, [('scaling_arg', 'args')]),
                           (img2float, convert2rad, [('out_file', 'in_file')]),
-                          (convert2rad, makecomplex, [('out_file', 'phase_in_file')]), # 3
-                          (inputspec, makecomplex, [('input_mag', 'magnitude_in_file')]),
-                          (makecomplex, splitcomplex, [('complex_out_file', 'complex_in_file')]), # 4
+                          (convert2rad, convert2real, [('out_file', 'in_file')]),
+                          (convert2rad, convert2imag, [('out_file', 'in_file')]),
+                          (inputspec, convert2real, [('input_mag', 'operand_files')]),
+                          (inputspec, convert2imag, [('input_mag', 'operand_files')]),
                           (inputspec, mocoreal, [('motion_par', 'in_matrix')]), # 5 real
-                          (splitcomplex, mocoreal, [('real_out_file', 'in_file')]),
+                          (convert2real, mocoreal, [('out_file', 'in_file')]),
                           (mocoreal, cpgeommocoreal, [('out_file','dest_file')]), #6 real
                           (img2float, cpgeommocoreal, [('out_file', 'in_file')]),
                           (inputspec, mocoimag, [('motion_par', 'in_matrix')]), # 5 imag
-                          (splitcomplex, mocoimag, [('imaginary_out_file', 'in_file')]),
+                          (convert2imag, mocoimag, [('out_file', 'in_file')]),
                           (mocoimag, cpgeommocoimag, [('out_file','dest_file')]), # 6 imag
                           (img2float, cpgeommocoimag, [('out_file', 'in_file')]),
-                          (cpgeommocoreal, makecomplexmoco, [('out_file', 'real_in_file')]), # 7
-                          (cpgeommocoimag, makecomplexmoco, [('out_file', 'imaginary_in_file')]),
-                          (makecomplexmoco, splitcomplexmoco, [('complex_out_file', 'complex_in_file')]),
-                          (splitcomplexmoco, cpgeommocophase, [('phase_out_file', 'dest_file')]),
-                          (img2float, cpgeommocophase, [('out_file', 'in_file')]),
-                          (cpgeommocophase, prepphase, [('out_file', 'phase')]), # 8
+                          (cpgeommocoimag, convert2phase, [('out_file', 'imaginary_image')]), # 7
+                          (cpgeommocoreal, convert2phase, [('out_file', 'real_image')]),
+                          (convert2phase, prepphase, [('phase_image', 'phase')]), # 8
                           (prepphase, maskfunc, [('detrended_phase', 'in_file')]), # 9
                           (inputspec, maskfunc, [('mask_file', 'in_file2')]),
-                          (maskfunc, outputspec,[('out_file', 'proc_phase')]),
+                          (maskfunc, outputspec, [('out_file', 'proc_phase')]),
                           (prepphase, outputspec, [('uw_phase', 'uw_phase')]),
                           (prepphase, outputspec, [('delta_phase', 'delta_phase')]),
                           (inputspec, calcSNR, [('rest', 'rest'), # 10
