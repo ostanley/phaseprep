@@ -10,7 +10,7 @@ from bids.layout import BIDSLayout
 from nipype import config, logging
 from phaseprep.interfaces import PhaseFitOdr
 from nipype.utils.filemanip import split_filename
-
+import time
 
 def get_tasklength(filename):
     # TODO: write block based specifity
@@ -179,8 +179,8 @@ def runpipeline(parser):
                        ])
 
     print("setup pipline succesfully")
-    if args.test is True:
-        starttime = time()
+    if not args.test:
+        starttime = time.time()
         phaseprep.run(plugin='MultiProc', plugin_args={'n_procs': nthreads})
         print("completed pipeline in ", time()-starttime, " seconds.")
 
