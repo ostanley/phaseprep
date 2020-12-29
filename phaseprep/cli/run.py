@@ -27,6 +27,51 @@ def get_restlength(filename):
     else:
         return -1
 
+def get_magandphase(bids_dir, subject_id):
+    from bids.layout import BIDSLayout
+    from nipype.utils.filemanip import split_filename
+    layout = BIDSLayout(bids_dir, validate=False)
+    maglist = layout.get(subject=subject_id, datatype='func',
+                         suffix='bold', extension=['.nii', '.nii.gz'])
+    phaselist = layout.get(subject=subject_id, datatype='func',
+                           suffix='phase', extension=['.nii', '.nii.gz'])
+    print(f"Found {max(len(maglist), len(phaselist))} functional runs for {subject_id}.")
+
+    # get list of phase runs
+    phaseruns = [f.run for f in phaselist]
+
+    maglist_final = []
+    phaselist_final = []
+    # TODO: Match when there are multiple types of different runs
+    for f in maglist:
+        if f.run in phaseruns:
+            pf = phaselist[phaseruns.index(f.run)]
+
+            # Check that runs have matching prefixes
+            _, fname, _ = split_filename(f.filename)
+            _, pfname, _ = split_filename(pf.filename)
+            if fname[:-4] != pfname[:-5]:
+                continue
+
+            # Check that runs have matching length, if not exclude.
+            if 'dcmmeta_shape' in f.get_metadata().keys():
+                if f.get_metadata()['dcmmeta_shape'][-1] != pf.get_metadata()['dcmmeta_shape'][-1]:
+                    continue
+
+            # Check that runs have matching acq time, if not exclude.
+            if 'AcquisitionTime' in f.get_metadata().keys():
+                if f.get_metadata()['AcquisitionTime'] != pf.get_metadata()['AcquisitionTime']:
+                    continue
+
+            maglist_final.append(f)
+            phaselist_final.append(phaselist[phaseruns.index(f.run)])
+
+    print(f"{len(maglist_final)} runs with phase and magnitude were found for {subject_id}.")
+    print("Runs: ", [f.run for f in maglist_final])
+    print("These runs have a matching length, name, and acquisition times.\n")
+
+    return maglist_final, phaselist_final
+
 
 def runpipeline(parser):
     # Parse inputs
@@ -94,53 +139,18 @@ def runpipeline(parser):
         print(type(subjid))
     else:
         subject_id = layout.get_subjects()
+    
+    infosource = pe.Node(interface=ul.IdentityInterface(fields=['subject_id']),
+                         name="infosource")
+    infosource.iterables = [('subject_id', subject_id)]
 
-    # need to report on what subjects and what runs will be processed
-    for subj in subjid:
-        maglist = layout.get(subject=subject_id, datatype='func',
-                             suffix='bold', extension=['nii', 'nii.gz'])
-        phaselist = layout.get(subject=subject_id, datatype='func',
-                               suffix='phase', extension=['nii', 'nii.gz'])
-        print("Found ", max(len(maglist), len(phaselist)), " functional runs.")
-
-        # get list of phase runs
-        phaseruns = [f.run for f in phaselist]
-
-        maglist_final = []
-        phaselist_final = []
-        # TODO: Match when there are multiple types of different runs
-        for f in maglist:
-            if f.run in phaseruns:
-                pf = phaselist[phaseruns.index(f.run)]
-                print("Processing magnitude run: ", f.run, "\n")
-
-                # Check that runs have matching prefixes
-                _, fname, _ = split_filename(f.filename)
-                _, pfname, _ = split_filename(pf.filename)
-                if fname[:-4] != pfname[:-5]:
-                    continue
-
-                # Check that runs have matching length, if not exclude.
-                if 'dcmmeta_shape' in f.get_metadata().keys():
-                    if f.get_metadata()['dcmmeta_shape'][-1] != pf.get_metadata()['dcmmeta_shape'][-1]:
-                        continue
-
-                # Check that runs have matching acq time, if not exclude.
-                if 'AcquisitionTime' in f.get_metadata().keys():
-                    if f.get_metadata()['AcquisitionTime'] != pf.get_metadata()['AcquisitionTime']:
-                        continue
-
-                maglist_final.append(f)
-                phaselist_final.append(phaselist[phaseruns.index(f.run)])
-
-        print(len(maglist_final), "runs with phase and magnitude were found.")
-        print("Runs: ", [f.run for f in maglist_final])
-        print("These runs have a matching length, name, and acquisition times.\n")
+    filegrabber = pe.Node(ul.Function(function=get_magandphase, input_names=["bids_dir","subject_id"], 
+                                      output_names=["maglist", "phaselist"]), name="filegrabber")
+    filegrabber.inputs.bids_dir = bids_dir
 
     # Step two will be magnitude preprocessing
     preproc_mag_wf = create_preprocess_mag_wf()
     preproc_mag_wf.inputs.inputspec.frac = bet_thr
-    preproc_mag_wf.inputs.inputspec.input_mag = maglist_final
     preproc_mag_wf.inputs.extractor.robust = small_fov
     if read_task_SNR is True:
         preproc_mag_wf.inputs.inputspec.task = get_tasklength(maglist_final)
@@ -151,7 +161,6 @@ def runpipeline(parser):
 
     # Step three will be phase preprocessing
     preproc_phase_wf = create_preprocess_phase_wf()
-    preproc_phase_wf.inputs.inputspec.input_mag = phaselist_final
     if read_task_SNR is True:
         preproc_mag_wf.inputs.inputspec.task = get_tasklength(phaselist_final)
         preproc_mag_wf.inputs.inputspec.rest = get_restlength(phaselist_final)
@@ -171,7 +180,10 @@ def runpipeline(parser):
 
     phaseprep = pe.Workflow(name='phaseprep')
     phaseprep.base_dir = work_dir
-    phaseprep.connect([(preproc_mag_wf, preproc_phase_wf, [('outputspec.motion_par',
+    phaseprep.connect([(infosource, filegrabber, [('subject_id','subject_id')]),
+                       (filegrabber, preproc_mag_wf, [('maglist','inputspec.input_mag')]),
+                       (filegrabber, preproc_phase_wf, [('phaselist','inputspec.input_phase')]),
+                       (preproc_mag_wf, preproc_phase_wf, [('outputspec.motion_par',
                                                            'inputspec.motion_par'),
                                                            ('outputspec.mask_file',
                                                            'inputspec.mask_file')]),
@@ -181,8 +193,9 @@ def runpipeline(parser):
     print("setup pipline succesfully")
     if not args.test:
         starttime = time.time()
-        phaseprep.run(plugin='MultiProc', plugin_args={'n_procs': nthreads})
-        print("completed pipeline in ", time()-starttime, " seconds.")
+        phaseprep.write_graph(format='png')
+        phaseprep.run(plugin='Linear')#plugin='MultiProc', plugin_args={'n_procs': nthreads})
+        print("completed pipeline in ", time.time()-starttime, " seconds.")
 
 
 
