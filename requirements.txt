@@ -1,6 +1,6 @@
 nibabel==3.2.1
 numpy==1.19.4
-scipy==1.5.4
+scipy==1.5.2
 threadpoolctl==1.1.0
 pybids==0.12.4
 nipype==1.6.0
