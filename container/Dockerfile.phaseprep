@@ -1,0 +1,21 @@
+FROM waltyelnats/phaseprep:neurobase
+
+RUN sudo apt-get install -y graphviz libgraphviz-dev
+
+WORKDIR /opt
+RUN git clone https://github.com/ostanley/phaseprep.git
+WORKDIR /opt/phaseprep
+RUN git checkout NHP_Pipeline
+
+# install via conda then pip
+RUN conda config --add channels conda-forge
+RUN conda config --set channel_priority strict
+RUN conda install -n phaseprep numpy=1.19.4 \
+                               scipy=1.5.2 \
+                               nipype=1.6.0 \
+                               nibabel=3.2.1             
+RUN pip3 install -r requirements.txt
+RUN python3 setup.py install
+
+ENTRYPOINT ["python3", "/opt/phaseprep/phaseprep/cli/run.py"]
+
