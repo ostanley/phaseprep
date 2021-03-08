@@ -7,7 +7,7 @@ import numpy as np
 import os
 
 
-class PhaseFitOdr_RefactorInputSpec(BaseInterfaceInputSpec):
+class PhaseFitOdrInputSpec(BaseInterfaceInputSpec):
     phase = File(exists=True, desc='phase image', mandatory=True)
     mag = File(exists=True, desc='mag image', mandatory=True)
     TR = traits.Float(desc='repetition time of the scan', mandatory=True)
@@ -18,7 +18,7 @@ class PhaseFitOdr_RefactorInputSpec(BaseInterfaceInputSpec):
                                 "fixes numpy api to use all threads")
 
 
-class PhaseFitOdr_RefactorOutputSpec(TraitedSpec):
+class PhaseFitOdrOutputSpec(TraitedSpec):
     sim = File(exists=True, desc="sim")
     filt = File(exists=True, desc="filt")
     corr = File(exists=True, desc="corr")
@@ -30,7 +30,7 @@ class PhaseFitOdr_RefactorOutputSpec(TraitedSpec):
     beta = File(exists=True, desc="betas from fit")
 
 
-class PhaseFitOdr_Refactor(BaseInterface):
+class PhaseFitOdr(BaseInterface):
     """Nipype Interface to fit phase and magnitude data together
 
     Inputs:
@@ -38,8 +38,8 @@ class PhaseFitOdr_Refactor(BaseInterface):
     Outputs:
 
     """
-    input_spec = PhaseFitOdr_RefactorInputSpec
-    output_spec = PhaseFitOdr_RefactorOutputSpec
+    input_spec = PhaseFitOdrInputSpec
+    output_spec = PhaseFitOdrOutputSpec
 
     def multiplelinear(self, beta, x):
         f = np.zeros(x[0].shape)
