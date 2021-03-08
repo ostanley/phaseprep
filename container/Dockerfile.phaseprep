@@ -1,5 +1,6 @@
 FROM waltyelnats/phaseprep:neurobase
 
+RUN sudo apt-get update
 RUN sudo apt-get install -y graphviz libgraphviz-dev
 
 WORKDIR /opt
