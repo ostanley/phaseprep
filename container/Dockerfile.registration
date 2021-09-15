@@ -85,6 +85,15 @@ COPY ["./license.txt", "/opt/freesurfer-6.0.0/license.txt"]
 
 ENV FS_LICENSE="/opt/license.txt"
 
+# install c3d from neurodebian
+COPY neurodebian.gpg /usr/local/etc/neurodebian.gpg
+
+RUN curl -sSL "http://neuro.debian.net/lists/$( lsb_release -c | cut -f2 ).us-ca.full" >> /etc/apt/sources.list.d/neurodebian.sources.list && \
+    apt-key add /usr/local/etc/neurodebian.gpg && \
+    (apt-key adv --refresh-keys --keyserver hkp://ha.pool.sks-keyservers.net 0xA5D32F012649A5A9 || true)
+RUN apt-get update
+RUN apt-get install convert3d
+
 RUN echo '{ \
     \n  "pkg_manager": "apt", \
     \n  "instructions": [ \
