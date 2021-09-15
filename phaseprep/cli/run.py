@@ -280,7 +280,7 @@ def runpipeline(parser):
 
     # Regress ge magnitude and phase
     phaseregress = pe.MapNode(
-        interface=PhaseFitOdr.PhaseFitOdr(),
+        interface=PhaseFitOdr(),
         name="phaseregressodr",
         iterfield=["phase", "mag", "TR"],
     )
@@ -333,7 +333,7 @@ def runpipeline(parser):
         )
 
         phaseregress_multi = pe.MapNode(
-            interface=PhaseFitOdr.PhaseFitOdr(),
+            interface=PhaseFitOdr(),
             name="phaseregress_multi",
             iterfield=["phase", "mag", "global_regressors", "TR"],
         )
