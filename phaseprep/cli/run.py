@@ -284,7 +284,7 @@ def runpipeline(parser):
         name="phaseregressodr",
         iterfield=["phase", "mag", "TR"],
     )
-    phaseregress.iterables = ("noise_lb", [0.1, 0.15, 0.25, 0.4])
+    phaseregress.iterables = ("noise_lb", [0.15])
     phaseregress.inputs.n_threads = 1
 
     sink_dict["micro"] = sink_dict["procmag"].clone("micro")
