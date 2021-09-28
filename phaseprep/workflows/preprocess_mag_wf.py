@@ -139,7 +139,7 @@ def create_preprocess_mag_wf():
                         (cpgeommoco, maskfunc, [('out_file', 'in_file')]),
                         (extractor, maskfunc, [('mask_file', 'in_file2')]),
                         (maskfunc, outputspec, [('out_file', 'proc_mag')]),
-                        (volreg, outputspec, [('oned_matrix_save', 'motion_par')]),
+                        (cat_xfm, outputspec, [('out_file', 'motion_par')]),
                         (volreg, outputspec, [('oned_file', 'motion_data')]),
                         (volreg, outputspec, [('md1d_file', 'maxdisp_data')]),
                         (plotmc, outputspec, [('out_file', 'motion_plot')]),
