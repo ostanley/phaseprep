@@ -13,7 +13,7 @@ class PhaseFitOdrInputSpec(BaseInterfaceInputSpec):
     TR = traits.Float(desc='repetition time of the scan', mandatory=True)
     noise_lb = traits.Float(desc='Noise filter lower bound; should be higher'
                                  ' than pyiological signal')
-    global_regressors = File(exists=True, desc='File of regressors (.tsv)')
+    global_regressors = File(exists=True, desc='File of regressors (.tsv), TODO')
     n_threads = traits.Int(desc="number of threads to limit pool to,"
                                 "fixes numpy api to use all threads")
 
@@ -59,6 +59,9 @@ class PhaseFitOdr(BaseInterface):
         stdp, _ = self.get_noise_est(phase)
 
         if regressors is not None:
+            # This is my first attempt at including regressors such as motion into the ODR fit
+            # It is unfinished at present
+            print('This option is experimental and not tested')
             design = np.concatenate((phase[:, np.newaxis], regressors,
                                      np.ones_like(phase[:, np.newaxis])), axis=1).T
             ests = np.concatenate(([stdm/stdp],
@@ -84,7 +87,7 @@ class PhaseFitOdr(BaseInterface):
         # call : (x,y,sx,sy)
         odr_obj = odr.ODR(mydata, linearfit, beta0=ests, maxit=400)
         res = odr_obj.run()
-        return res, design
+        return res, design, stdm, stdp
 
     def _run_interface(self, runtime):
         f = nb.load(self.inputs.mag)
@@ -126,11 +129,13 @@ class PhaseFitOdr(BaseInterface):
 
         for x in range(mag.shape[0]):
             if mask[x]:
-                res, design = self.run_ODR(
+                res, design, stdm[x], stdp[x] = self.run_ODR(
                     mag[x, :], ph[x, :], regressors=regressors)
-                est = res.y  # self.multiplelinear(res.beta, design)
+                est = res.y 
                 r2[x] = 1.0 - sum((mag[x, :] - est) ** 2) / \
                     sum((mag[x, :] - mm[x]) ** 2)
+                #r2_adj is for the multi-regressor case only
+                #unless that is implemented it is not meaningful
                 r2_adj[x] = 1.0 - (1-r2[x])*(nt-1)/(nt-res.beta.size-2)
                 exit[x] = res.info
                 beta[x, :] = res.beta

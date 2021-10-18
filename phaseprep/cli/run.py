@@ -278,7 +278,7 @@ def runpipeline(parser):
         ]
     )
 
-    # Regress ge magnitude and phase
+    #Step 4 Regress ge magnitude and phase
     phaseregress = pe.MapNode(
         interface=PhaseFitOdr(),
         name="phaseregressodr",
@@ -318,76 +318,6 @@ def runpipeline(parser):
         ]
     )
 
-    # if tcompcor is true run with tcompcor applied as well
-    if args.tcompcor:
-        tcompcor = pe.MapNode(interface=TCompCor(), name="tcompcor", iterfield=["realigned_file"])
-
-        stripheader_tcompcor = pe.MapNode(
-            interface=ul.Function(
-                function=stripheader,
-                input_names=["filename"],
-                output_names=["new_filename"],
-            ),
-            name="stripheader_tcompcor",
-            iterfield=["filename"],
-        )
-
-        phaseregress_multi = pe.MapNode(
-            interface=PhaseFitOdr(),
-            name="phaseregress_multi",
-            iterfield=["phase", "mag", "global_regressors", "TR"],
-        )
-        phaseregress_multi.inputs.n_threads = 1
-        phaseregress_multi.iterables = ("noise_lb", [0.1, 0.15, 0.25, 0.4])
-
-        sink_dict["micro_tcomp"] = sink_dict["procmag"].clone("micro_tcomp")
-        sink_dict["micro_tcomp"].inputs.desc = "micro_tcomp"
-        sink_dict["macro_tcomp"] = sink_dict["procmag"].clone("macro_tcomp")
-        sink_dict["macro_tcomp"].inputs.desc = "macro_tcomp"
-        sink_dict["r2_tcomp"] = sink_dict["procmag"].clone("r2_tcomp")
-        sink_dict["r2_tcomp"].inputs.desc = "r2_tcomp"
-        sink_dict["beta_tcomp"] = sink_dict["procmag"].clone("beta_tcomp")
-        sink_dict["beta_tcomp"].inputs.desc = "beta_tcomp"
-
-        phaseprep.connect(
-            [
-                (
-                    preproc_mag_wf,
-                    tcompcor,
-                    [
-                        ("outputspec.proc_mag", "realigned_file"),
-                        ("outputspec.mask_file", "mask_files"),
-                    ],
-                ),
-                (tcompcor, stripheader_tcompcor, [("components_file", "filename")]),
-                (
-                    stripheader_tcompcor,
-                    phaseregress_multi,
-                    [("new_filename", "global_regressors")],
-                ),
-                (
-                    preproc_mag_wf,
-                    phaseregress_multi,
-                    [
-                        ("outputspec.proc_mag", "mag"),
-                        (("outputspec.proc_mag", get_TR), "TR"),
-                    ],
-                ),
-                (
-                    preproc_phase_wf,
-                    phaseregress_multi,
-                    [("outputspec.proc_phase", "phase")],
-                ),
-                (phaseregress_multi, sink_dict["macro_tcomp"], [("filt", "in_file")]),
-                (filegrabber, sink_dict["macro_tcomp"], [("maglist", "source_file")]),
-                (phaseregress_multi, sink_dict["micro_tcomp"], [("sim", "in_file")]),
-                (filegrabber, sink_dict["micro_tcomp"], [("maglist", "source_file")]),
-                (phaseregress_multi, sink_dict["r2_tcomp"], [("corr", "in_file")]),
-                (filegrabber, sink_dict["r2_tcomp"], [("maglist", "source_file")]),
-                (phaseregress, sink_dict["beta_tcomp"], [("beta", "in_file")]),
-                (filegrabber, sink_dict["beta_tcomp"], [("maglist", "source_file")]),
-            ]
-        )
     # Step five will be ongoing during the previous steps ensuring correct sinking
     # Step six will be running this into a report
 
@@ -466,7 +396,7 @@ if __name__ == "__main__":
     g_opt.add_argument(
         "--fmriprep-dir",
         dest="fmriprep",
-        help="TODO If fmriprep has been run and you wish to use"
+        help="Not implemented: If fmriprep has been run and you wish to use"
         " their transformations, the directory where the output"
         " is stored",
     )
@@ -481,6 +411,6 @@ if __name__ == "__main__":
         "--tcompcor",
         dest="tcompcor",
         action="store_true",
-        help="also perform regression on tcompcor of data",
+        help="Not implemented: also perform regression on tcompcor of data",
     )
     runpipeline(parser)

@@ -6,7 +6,7 @@ RUN sudo apt-get install -y graphviz libgraphviz-dev
 WORKDIR /opt
 RUN git clone https://github.com/ostanley/phaseprep.git
 WORKDIR /opt/phaseprep
-RUN git checkout NHP_Pipeline
+RUN git checkout master
 
 # install via conda then pip
 RUN conda config --add channels conda-forge
