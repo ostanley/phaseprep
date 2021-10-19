@@ -216,7 +216,7 @@ def runpipeline(parser):
         DerivativesDataSink(
             desc="procmag",
             out_path_base="phaseprep",
-            base_directory="out_dir",
+            base_directory=out_dir,
             compress=True,
         ),
         name="dsink_procmag",
