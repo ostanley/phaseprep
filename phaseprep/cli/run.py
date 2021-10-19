@@ -67,6 +67,20 @@ def stripheader(filename):
     return new_filename
 
 
+def make_sink(sink_dict, name, desc=None, out_dir="."):
+    sink_dict[name] = pe.MapNode(
+        DerivativesDataSink(
+            desc=desc,
+            out_path_base="phaseprep",
+            base_directory=out_dir,
+            compress=True,
+        ),
+        name=name,
+        iterfield=["in_file", "source_file"],
+    )
+    return sink_dict
+
+
 def get_magandphase(bids_dir, subject_id):
     from bids.layout import BIDSLayout
     from nipype.utils.filemanip import split_filename
@@ -212,16 +226,7 @@ def runpipeline(parser):
     preproc_mag_wf.inputs.inputspec.frac = bet_thr
     preproc_mag_wf.inputs.extractor.robust = small_fov
 
-    sink_dict["procmag"] = pe.MapNode(
-        DerivativesDataSink(
-            desc="procmag",
-            out_path_base="phaseprep",
-            base_directory=out_dir,
-            compress=True,
-        ),
-        name="dsink_procmag",
-        iterfield=["in_file", "source_file"],
-    )
+    sink_dict = make_sink(sink_dict, "procmag", desc="procmag", out_dir=out_dir)
 
     phaseprep.connect(
         [
@@ -246,8 +251,7 @@ def runpipeline(parser):
     # Step three will be phase preprocessing
     preproc_phase_wf = create_preprocess_phase_wf()
 
-    sink_dict["procphase"] = sink_dict["procmag"].clone("procphase")
-    sink_dict["procphase"].inputs.desc = "procphase"
+    sink_dict = make_sink(sink_dict, "procphase", desc="procphase", out_dir=out_dir)
 
     phaseprep.connect(
         [
@@ -287,14 +291,10 @@ def runpipeline(parser):
     phaseregress.iterables = ("noise_lb", [0.15])
     phaseregress.inputs.n_threads = 1
 
-    sink_dict["micro"] = sink_dict["procmag"].clone("micro")
-    sink_dict["micro"].inputs.desc = "micro"
-    sink_dict["macro"] = sink_dict["procmag"].clone("macro")
-    sink_dict["macro"].inputs.desc = "macro"
-    sink_dict["r2"] = sink_dict["procmag"].clone("r2")
-    sink_dict["r2"].inputs.desc = "r2"
-    sink_dict["beta"] = sink_dict["procmag"].clone("beta")
-    sink_dict["beta"].inputs.desc = "beta"
+    sink_dict = make_sink(sink_dict, "macro", desc="macro", out_dir=out_dir)
+    sink_dict = make_sink(sink_dict, "micro", desc="micro", out_dir=out_dir)
+    sink_dict = make_sink(sink_dict, "r2", desc="r2", out_dir=out_dir)
+    sink_dict = make_sink(sink_dict, "beta", desc="beta", out_dir=out_dir)
 
     phaseprep.connect(
         [
