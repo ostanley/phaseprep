@@ -1,5 +1,5 @@
 nibabel==3.2.1
-numpy==1.19.4
+numpy==1.22.0
 scipy==1.5.2
 threadpoolctl==1.1.0
 pybids==0.12.4
